@@ -9,7 +9,19 @@ const users = [
   { id: 3, username: "nhor", display: "marche14" },
 ];
 
+// Add body-parser middleware
+app.use(express.json());
 app.use(cors());
+app.use(express.urlencoded({ extended: false }));
+
+app.listen(PORT, () => {
+  console.log(`server started on ${PORT}`);
+});
+
+app.post("/api/auth/register", (req, res) => {
+  const { name, email, password } = req.body;
+  console.log(name, email, password);
+});
 
 app.get("/api/home", (req, res) => {
   res.json({
@@ -35,6 +47,13 @@ app.get("/api/users/:id", (req, res) => {
   return res.send(findusers);
 });
 
-app.listen(PORT, () => {
-  console.log(`server started on ${PORT}`);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send("Something broke!");
+});
+
+// Handle 404
+app.use((req, res) => {
+  res.status(404).send("Not found");
 });
