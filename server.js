@@ -2,49 +2,84 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const PORT = 8080;
+const dotenv = require("dotenv");
+const { default: mongoose, Schema } = require("mongoose");
 
-const users = [
-  { id: 1, username: "rhyss", display: "Ronmarche14" },
-  { id: 2, username: "ron", display: "Ron14" },
-  { id: 3, username: "nhor", display: "marche14" },
-];
+const registrations = [];
 
 // Add body-parser middleware
+dotenv.config();
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:3000", // or your frontend URL
+    methods: ["GET", "POST"],
+    credentials: true,
+  }),
+);
 app.use(express.urlencoded({ extended: false }));
 
-app.listen(PORT, () => {
-  console.log(`server started on ${PORT}`);
-});
-
-app.post("/api/auth/register", (req, res) => {
-  const { name, email, password } = req.body;
-  console.log(name, email, password);
-});
-
-app.get("/api/home", (req, res) => {
-  res.json({
-    message: "Like thiss like thisss",
-    people: ["berry", "john", "geh"],
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log("MongoDB Connected");
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+    process.exit(1);
   });
+
+const inputField = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
 });
 
-app.get("/api/users", (req, res) => {
-  res.send(users);
+// Remove 'new' keyword here - it's incorrect syntax
+const InputItems = mongoose.model("itemField", inputField);
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    // Check if user already exists
+    const existingUser = await InputItems.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+
+    const itemsData = new InputItems({ name, email, password });
+    await itemsData.save();
+
+    res.json({
+      success: true,
+      message: "User registered successfully",
+      user: itemsData,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: err.message || "Failed to register user",
+    });
+  }
 });
 
-app.get("/api/users/:id", (req, res) => {
-  console.log(req.params);
-  const parsedId = parseInt(req.params.id);
-  console.log(parsedId);
-  if (isNaN(parsedId))
-    return res.status(400).send({ msg: "badrequest, invalid ID" });
-
-  const findusers = users.find((user) => user.id === parsedId);
-
-  if (!findusers) return res.sendStatus(404);
-  return res.send(findusers);
+app.get("/api/auth/register", async (req, res) => {
+  try {
+    const users = await InputItems.find();
+    res.json({ registrations: users }); // Match frontend expectation
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: err.message || "Failed to fetch users",
+    });
+  }
 });
 
 // Error handling middleware
